@@ -19,6 +19,16 @@ app.post('/notes', async (c) => {
 	if (!record) {
 		return c.text("Failed to create note", 500);
 	}
+	const messages = [
+		{ role: 'system', content: 'You are a friendly summarization assistant. Take the input text and return a summary in three sentences.' },
+		{ role: 'user', content: text }
+	];
+	const summary = await ai.run('@cf/mistral/mistral-7b-instruct-v0.1', {
+		messages,
+		stream: true
+	});
+
+	console.log(summary);
 
 	const { data } = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [text] })
 	const values = data[0]
