@@ -20,7 +20,7 @@ app.post('/notes', async (c) => {
 		return c.text("Failed to create note", 500);
 	}
 	const messages = [
-		{ role: 'system', content: 'You are a friendly summarization assistant. Take the input text and return a summary in three sentences.' },
+		{ role: 'system', content: 'You are a friendly summarization assistant. Take the input text and return a summary in three sentences. Please keep your responses concise and limit them to a maximum of 500 tokens. If a summary exceeds this limit, kindly provide the most relevant information within the given constraint.' },
 		{ role: 'user', content: text }
 	];
 	const summary = await ai.run('@cf/mistral/mistral-7b-instruct-v0.1', {
