@@ -10,15 +10,6 @@ app.post('/notes', async (c) => {
 		return c.text("Missing text", 400);
 	}
 
-	const { results } = await c.env.DB.prepare("INSERT INTO notes (text) VALUES (?) RETURNING *")
-		.bind(text)
-		.run()
-
-	const record = results.length ? results[0] : null
-
-	if (!record) {
-		return c.text("Failed to create note", 500);
-	}
 	const messages = [
 		{ role: 'system', content: 'You are a friendly summarization assistant. Take the input text and return a summary in three sentences. Please keep your responses concise and limit them to a maximum of 500 tokens. If a summary exceeds this limit, kindly provide the most relevant information within the given constraint.' },
 		{ role: 'user', content: text }
@@ -27,12 +18,19 @@ app.post('/notes', async (c) => {
 		messages
 	});
 
-	console.log(summary);
-
-
 
 	const { data } = await ai.run('@cf/baai/bge-base-en-v1.5', { text: summary.response })
 	const values = data[0]
+
+	const { results } = await c.env.DB.prepare("INSERT INTO notes (text) VALUES (?) RETURNING *")
+		.bind(summary.response)
+		.run()
+
+	const record = results.length ? results[0] : null
+
+	if (!record) {
+		return c.text("Failed to create note", 500);
+	}
 
 	if (!values) {
 		return c.text("Failed to generate vector embedding", 500);
