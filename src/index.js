@@ -24,13 +24,14 @@ app.post('/notes', async (c) => {
 		{ role: 'user', content: text }
 	];
 	const summary = await ai.run('@cf/mistral/mistral-7b-instruct-v0.1', {
-		messages,
-		stream: true
+		messages
 	});
 
 	console.log(summary);
 
-	const { data } = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [text] })
+
+
+	const { data } = await ai.run('@cf/baai/bge-base-en-v1.5', { text: summary.response })
 	const values = data[0]
 
 	if (!values) {
@@ -45,7 +46,7 @@ app.post('/notes', async (c) => {
 		}
 	])
 
-	return c.json({ id, text, inserted })
+	return c.json({ id, summary, inserted })
 })
 
 app.get('/', async (c) => {
