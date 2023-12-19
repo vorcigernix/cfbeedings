@@ -5,46 +5,63 @@ const app = new Hono()
 app.post('/notes', async (c) => {
 	const ai = new Ai(c.env.AI)
 
-	const { text } = await c.req.json()
-	if (!text) {
-		return c.text("Missing text", 400);
+	const texts = await c.req.json()
+	if (!texts || !Array.isArray(texts)) {
+		return c.text("Missing texts or texts is not an array", 400);
 	}
-
-	const messages = [
-		{ role: 'system', content: 'You are a friendly summarization assistant. Take the input text and return a summary in three sentences. Please keep your responses concise and limit them to a maximum of 500 tokens. If a summary exceeds this limit, kindly provide the most relevant information within the given constraint.' },
-		{ role: 'user', content: text }
-	];
-	const summary = await ai.run('@cf/mistral/mistral-7b-instruct-v0.1', {
-		messages
-	});
-
-
-	const { data } = await ai.run('@cf/baai/bge-base-en-v1.5', { text: summary.response })
-	const values = data[0]
-
-	const { results } = await c.env.DB.prepare("INSERT INTO notes (text) VALUES (?) RETURNING *")
-		.bind(summary.response)
-		.run()
-
-	const record = results.length ? results[0] : null
-
-	if (!record) {
-		return c.text("Failed to create note", 500);
-	}
-
-	if (!values) {
-		return c.text("Failed to generate vector embedding", 500);
-	}
-
-	const { id } = record
-	const inserted = await c.env.VECTOR_INDEX.upsert([
-		{
-			id: id.toString(),
-			values,
+	const results = await Promise.all(texts.map(async (text) => {
+		//console.log(text);
+		if (!text) {
+			return c.json("Missing text", 400);
 		}
-	])
 
-	return c.json({ id, summary, inserted })
+		const messages = [
+			{ "role": "system", "content": "You are a friendly summarization assistant. Take the input text and return a summary in three sentences. Please keep your responses concise and limit them to a maximum of 500 tokens. If a summary exceeds this limit, kindly provide the most relevant information within the given constraint." },
+			{ "role": "user", "content": `${text}` }
+		]
+
+		try {
+			const summary = await ai.run('@cf/mistral/mistral-7b-instruct-v0.1', {
+				messages
+			});
+
+
+			if (!summary || !summary.response) {
+				console.log("Failed to summarize text");
+			}
+		} catch (e) {
+			console.log(e);
+		}
+		const { data } = await ai.run('@cf/baai/bge-base-en-v1.5', { text: summary.response })
+		const values = data[0]
+
+
+		const { results } = await c.env.DB.prepare("INSERT INTO notes (text) VALUES (?) RETURNING *")
+			.bind(summary.response)
+			.run()
+
+		const record = results.length ? results[0] : null
+
+		if (!record) {
+			return c.text("Failed to create note", 500);
+		}
+
+		if (!values) {
+			return c.text("Failed to generate vector embedding", 500);
+		}
+
+		const { id } = record
+		const inserted = await c.env.VECTOR_INDEX.upsert([
+			{
+				id: id.toString(),
+				values,
+			}
+		])
+
+		return c.json({ id, summary, inserted })
+	}));
+
+	return c.text("Success", 200);
 })
 
 app.get('/', async (c) => {
